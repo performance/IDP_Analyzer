@@ -1,7 +1,7 @@
 # IDP_Analyzer
 A simple tool to help learn Rust
 
-The format for IDP images:
+# The format for IDP images:
 1. All values are in LittleEndian
 2. first u32 is always 0
 3. second u32 is 0 for u16, 16 bit GrayScale images
