@@ -222,14 +222,18 @@ impl<R: Read + Seek> ImageDecoder for IDPDecoder<R> {
 
         let _ignoreme = match result {
             DecodingResult::U16(ref mut buffer) => {
-                try!(self.expand_strip(
-                    DecodingBuffer::U16(&mut buffer)
-                ))
+                try!(
+                    self.expand_strip(
+                        DecodingBuffer::U16( buffer )
+                    )
+                )
             },
             DecodingResult::F32(ref mut buffer) => {
-                try!(self.expand_strip(
-                    DecodingBuffer::F32(&mut buffer)
-                ))
+                try!(
+                    self.expand_strip(
+                        DecodingBuffer::F32( buffer)
+                    )
+                )
             },
         };
         
