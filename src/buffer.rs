@@ -10,7 +10,7 @@ use std::io::{BufReader, BufWriter};
 use std::fs::File;
 use stream::{
     ByteOrder,
-    // EndianWriter,
+    EndianWriter,
     SmartWriter,
     // SmartReader
 };
@@ -140,6 +140,44 @@ pub struct ImageBuffer<P: Pixel, Container> {
     data: Container,
 }
 
+
+impl<P, Container> GenericImage for ImageBuffer<P, Container>
+where P: Pixel + 'static,
+      Container: Deref<Target=[P::Subpixel]> + DerefMut,
+      P::Subpixel: 'static {
+
+    type Pixel = P;
+
+    fn dimensions(&self) -> (u32, u32) {
+        self.dimensions()
+    }
+
+    fn bounds(&self) -> (u32, u32, u32, u32) {
+        (0, 0, self.width, self.height)
+    }
+
+    fn get_pixel(&self, x: u32, y: u32) -> P {
+        *self.get_pixel(x, y)
+    }
+
+    fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut P {
+        self.get_pixel_mut(x, y)
+    }
+
+    fn put_pixel(&mut self, x: u32, y: u32, pixel: P) {
+        *self.get_pixel_mut(x, y) = pixel
+    }
+
+
+    fn pixels(&self) -> Pixels<Self> {
+        let (width, height) = self.dimensions();
+
+        Pixels::new ( self, 0, 0, width, height )
+    }
+
+}
+
+
 // generic implementation, shared along all image buffers
 impl<P, Container> ImageBuffer<P, Container>
 where P: Pixel + 'static,
@@ -267,8 +305,10 @@ where P: Pixel + 'static,
     }
 }
 
+
 impl<P, Container> ImageBuffer<P, Container>
-where P: Pixel<Subpixel=f32> + 'static,
+where P: Pixel + 'static , P::Subpixel: Primitive + 'static
+//where P: Pixel<Subpixel=f32> + 'static,
      // Container: Deref<Target=[f32]> 
      {
    /// Saves the buffer to a file at the path specified.
@@ -300,12 +340,12 @@ where P: Pixel<Subpixel=f32> + 'static,
        Ok( match pixel_type {
             PixelType::Short16 => {
                 for p in self.pixels() {
-                    try!(wtr.write_u16());
+                    try!(wtr.write_u16( p.value() ));
                 }
             },
             PixelType::Float32 => {
                 for p in self.pixels() {
-                    try!(wtr.write_f32());
+                    try!(wtr.write_f32( p.value() ));
                 }
             }
         })
@@ -367,41 +407,6 @@ where P: Pixel,
     }
 }
 
-impl<P, Container> GenericImage for ImageBuffer<P, Container>
-where P: Pixel + 'static,
-      Container: Deref<Target=[P::Subpixel]> + DerefMut,
-      P::Subpixel: 'static {
-
-    type Pixel = P;
-
-    fn dimensions(&self) -> (u32, u32) {
-        self.dimensions()
-    }
-
-    fn bounds(&self) -> (u32, u32, u32, u32) {
-        (0, 0, self.width, self.height)
-    }
-
-    fn get_pixel(&self, x: u32, y: u32) -> P {
-        *self.get_pixel(x, y)
-    }
-
-    fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut P {
-        self.get_pixel_mut(x, y)
-    }
-
-    fn put_pixel(&mut self, x: u32, y: u32, pixel: P) {
-        *self.get_pixel_mut(x, y) = pixel
-    }
-
-
-    fn pixels(&self) -> Pixels<Self> {
-        let (width, height) = self.dimensions();
-
-        Pixels::new ( self, 0, 0, width, height )
-    }
-
-}
 
 // concrete implementation for `Vec`-baked buffers
 // TODO: I think that rustc does not "see" this impl any more: the impl with

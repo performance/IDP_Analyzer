@@ -196,9 +196,9 @@ $( // START Structure definitions
 #[derive(PartialEq, Eq, Clone, Debug, Copy, Hash)]
 #[repr(C)]
 #[allow(missing_docs)]
-pub struct $ident<T: Primitive> { pub data: [T] }
+pub struct $ident<T: Primitive> { pub data: T }
 #[allow(non_snake_case, missing_docs)]
-pub fn $ident<T: Primitive>(data: [T]) -> $ident<T> {
+pub fn $ident<T: Primitive>(data: T) -> $ident<T> {
     $ident {
         data: data
     }
@@ -211,17 +211,17 @@ impl<T: Primitive + 'static> Pixel for $ident<T> {
     fn pixel_type() -> PixelType {
         // match 
         $pixel_type 
-//        {
-//            PixelType::Short16 => PixelType::Short16,
-//            PixelType::Float32 => PixelType::Float32 
-//        }
+       // {
+       //     PixelType::Short16 => PixelType::Short16,
+       //     PixelType::Float32 => PixelType::Float32 
+       // }
     }
     #[inline(always)]
-    fn values(&self) -> &[T] {
+    fn value(&self) -> &T {
         &self.data
     }
     #[inline(always)]
-    fn values_mut(&mut self) -> &mut [T] {
+    fn value_mut(&mut self) -> &mut T {
         &mut self.data
     }
     fn from_slice<'a>(slice: &'a [T]) -> &'a $ident<T> {
@@ -240,37 +240,35 @@ impl<T: Primitive + 'static> Pixel for $ident<T> {
     }
 
     fn apply<F>(&mut self, f: F) where F: Fn(T) -> T {
-        for v in self.data.iter_mut() {
-            *v = f(*v)
+        let mut v = self.data;
+            v = f(v)
         }
     }
 
-    fn map2<F>(&self, other: &Self, f: F) -> $ident<T> where F: Fn(T, T) -> T {
-        let mut this = (*self).clone();
-        this.apply2(other, f);
-        this
-    }
+//    fn map2<F>(&self, other: &Self, f: F) -> $ident<T> where F: Fn(T, T) -> T {
+//        let mut this = (*self).clone();
+//        this.apply2(other, f);
+//        this
+//    }
 
-    fn apply2<F>(&mut self, other: &$ident<T>, f: F) where F: Fn(T, T) -> T {
-        for (a, &b) in self.data.iter_mut().zip(other.data.iter()) {
-            *a = f(*a, b)
-        }
-
-    }
-}
+//    fn apply2<F>(&mut self, other: &$ident<T>, f: F) where F: Fn(T, T) -> T {
+//        let mut (a, &b) = (self.data, other.data );
+//        *a = f(*a, b);
+//    }
+    
 
 impl<T: Primitive> Index<usize> for $ident<T> {
     type Output = T;
     #[inline(always)]
     fn index<'a>(&'a self, _index: usize) -> &'a T {
-        &self.data[_index]
+        &self.data
     }
 }
 
 impl<T: Primitive> IndexMut<usize> for $ident<T> {
     #[inline(always)]
     fn index_mut<'a>(&'a mut self, _index: usize) -> &'a mut T {
-        &mut self.data[_index]
+        &mut self.data
     }
 }
 

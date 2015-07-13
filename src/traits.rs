@@ -47,10 +47,10 @@ pub trait Pixel: Copy + Clone {
     type Subpixel: Primitive;
 
     /// Returns the components as a slice.
-    fn values(&self) -> &Self::Subpixel;
+    fn value(&self) -> &Self::Subpixel;
 
     /// Returns the components as a mutable slice
-    fn values_mut(&mut self) -> &mut Self::Subpixel;
+    fn value_mut(&mut self) -> &mut Self::Subpixel;
 
     /// Returns a string that can help to interprete the meaning each channel
     /// See [gimp babl](http://gegl.org/babl/).
@@ -79,15 +79,15 @@ pub trait Pixel: Copy + Clone {
     /// Apply the function ```f``` to each channel of this pixel.
     fn apply<F>(&mut self, f: F) where F: Fn(Self::Subpixel) -> Self::Subpixel;
 
-    /// Apply the function ```f``` to each channel of this pixel and
-    /// ```other``` pairwise.
-    fn map2<F>(&self, other: &Self, f: F) -> Self
-        where F: Fn(Self::Subpixel, Self::Subpixel) -> Self::Subpixel;
-
-    /// Apply the function ```f``` to each channel of this pixel and
-    /// ```other``` pairwise. Works in-place.
-    fn apply2<F>(&mut self, other: &Self, f: F)
-        where F: Fn(Self::Subpixel, Self::Subpixel) -> Self::Subpixel;
+//    /// Apply the function ```f``` to each channel of this pixel and
+//    /// ```other``` pairwise.
+//    fn map2<F>(&self, other: &Self, f: F) -> Self
+//        where F: Fn(Self::Subpixel, Self::Subpixel) -> Self::Subpixel;
+//
+//    /// Apply the function ```f``` to each channel of this pixel and
+//    /// ```other``` pairwise. Works in-place.
+//    fn apply2<F>(&mut self, other: &Self, f: F)
+//        where F: Fn(Self::Subpixel, Self::Subpixel) -> Self::Subpixel;
 }
 
 
@@ -166,18 +166,18 @@ pub trait GenericImage: Sized {
     /// Returns an Iterator over the pixels of this image.
     /// The iterator yields the coordinates of each pixel
     /// along with their value
-    fn pixels(&self) -> Pixels<Self>
-    {
-       let (width, height) = self.dimensions();
+    fn pixels(&self) -> Pixels<Self>;
+    // {
+    //    let (width, height) = self.dimensions();
 
-       Pixels {
-           image:  self,
-           x:      0,
-           y:      0,
-           width:  width,
-           height: height,
-       }
-    }
+    //    Pixels {
+    //        image:  self,
+    //        x:      0,
+    //        y:      0,
+    //        width:  width,
+    //        height: height,
+    //    }
+    // }
 
     /// Copies all of the pixels from another image into this image.
     ///
