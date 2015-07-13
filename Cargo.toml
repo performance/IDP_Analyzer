@@ -10,3 +10,4 @@ name = "hello_world"
 
 [dependencies]
 byteorder = "*"
+num = "*"

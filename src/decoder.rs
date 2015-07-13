@@ -1,15 +1,22 @@
-use std::fmt;
-use std::io;
-use std::marker::PhantomData;
-use std::result::Result;
-use std::io::{Read, Write, Seek};
-use std::error::Error;
-use byteorder;
-// use byteorder::Error;
-// use byteorder::Error::UnexpectedEOF;
+// use std::fmt;
+// use std::io;
+// use std::marker::PhantomData;
+// use std::result::Result;
+use std::io::{Read, Seek};
+// use std::error::Error;
+// use byteorder;
+// use std::path::Path;
 
 
-use std::convert::From;
+use image::error::{
+    ImageError,
+    ImageResult
+};
+
+use image::other::{
+    DecodingBuffer,
+    DecodingResult
+};
 
 use super::stream::{
     ByteOrder,
@@ -22,68 +29,7 @@ pub enum PixelType {
     Float32
 }
 
-// pub type ImageError = String;
 
-/// An enumeration of Image Errors
-#[derive(Debug)]
-pub enum ImageError {
-    /// The Image is not formatted properly
-    FormatError(String),
-        /// An I/O Error occurred while decoding the image
-    IoError(io::Error)
-}
-
-
-
-impl fmt::Display for ImageError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            &ImageError::FormatError(ref e) => write!(fmt, "Format error: {}", e),
-            &ImageError::IoError(ref e) => e.fmt(fmt)
-        }
-    }
-}
-
-impl Error for ImageError {
-    fn description (&self) -> &str {
-        match *self {
-            ImageError::FormatError(..) => &"Format error",
-            ImageError::IoError(..) => &"IO error"
-        }
-    }
-
-    fn cause (&self) -> Option<&Error> {
-        match *self {
-            ImageError::IoError(ref e) => Some(e),
-            _ => None
-        }
-    }
-}
-
-impl From<io::Error> for ImageError {
-    fn from(err: io::Error) -> ImageError {
-        ImageError::IoError(err)
-    }
-}
-
-
-impl From<byteorder::Error> for ImageError {
-    fn from(err: byteorder::Error) -> ImageError {
-        match err {
-            byteorder::Error::UnexpectedEOF => ImageError::FormatError( "Format error: ".to_string()  ),
-            byteorder::Error::Io(err) => ImageError::IoError(err),
-        }
-    }
-}
-pub type ImageResult<T> = Result<T, ImageError>;
-
-/// Result of a decoding process
-pub enum DecodingResult {
-    /// A vector of unsigned bytes
-    U16(Vec<u16>),
-    /// A vector of unsigned words
-    F32(Vec<f32>)
-}
 
 /// The trait that all decoders implement
 pub trait ImageDecoder: Sized {
@@ -95,6 +41,10 @@ pub trait ImageDecoder: Sized {
     
     /// Decodes the entire image and return it as a Vector
     fn read_image(&mut self) -> ImageResult<DecodingResult>;
+
+    // Decodes the entire image and return it as a Vector
+    // fn write_image(self, path:Path, ) -> ImageResult<DecodingResult>;
+
 }
 
 
@@ -107,14 +57,6 @@ pub struct IDPDecoder<R> where R: Read + Seek {
     width: u32,
     height: u32,
     pixel_type: PixelType,
-}
-
-// A buffer for image decoding
-pub enum DecodingBuffer<'a> {
-    /// A slice of unsigned bytes
-    U16(&'a mut [u16]),
-    /// A slice of unsigned words
-    F32(&'a mut [f32])
 }
 
 
@@ -150,7 +92,6 @@ impl<R: Read + Seek> IDPDecoder<R> {
     }
 
     /// Reads in the next image.
-    /// If there is no further image in the TIFF file a format error is return.
     /// To determine whether there are more images call `IDPDecoder::more_images` instead.
     pub fn next_image(mut self) -> ImageResult<IDPDecoder<R>> {
         try!(self.read_header());
@@ -161,12 +102,12 @@ impl<R: Read + Seek> IDPDecoder<R> {
     /// Returns the number of bytes read.
     fn expand_strip<'a>(&mut self, decode_buffer: DecodingBuffer<'a> ) -> ImageResult<()> {
         let pixel_type : PixelType = try!(self.pixel_type() );
-        let num_pixels = self.width * self.height;
+        // let num_pixels = self.width * self.height;
         // let num_bytes = num_pixels * match ( pixel_type ) {
         //     PixelType::Short16 => 2,
         //     PixelType::Float32 => 4,
         // };
-        let mut reader: Box<EndianReader> = Box::new(SmartReader::wrap(&mut self.reader, self.byte_order ) ) ;
+        let mut reader = SmartReader::wrap(&mut self.reader, self.byte_order );
 
         Ok(match ( pixel_type, decode_buffer) {
             ( PixelType::Short16, DecodingBuffer::U16(ref mut buffer)) => {
@@ -179,7 +120,7 @@ impl<R: Read + Seek> IDPDecoder<R> {
                     *datum = try!(reader.read_f32());
                 }
             },
-            (type_, _) => return Err( ImageError::FormatError(
+            (_type_, _) => return Err( ImageError::FormatError(
                     format!( "Pixel type is unsupported")    
                 ) )
         })
@@ -204,7 +145,7 @@ impl<R: Read + Seek> ImageDecoder for IDPDecoder<R> {
         let number_of_pixels =
               self.width  as usize
             * self.height as usize;
-        let mut result = match ( self.pixel_type ) { 
+        let mut result = match self.pixel_type { 
             PixelType::Short16 => DecodingResult::U16( Vec::with_capacity(number_of_pixels)), 
             PixelType::Float32 => DecodingResult::F32( Vec::with_capacity(number_of_pixels)), 
         };
