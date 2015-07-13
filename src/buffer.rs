@@ -6,9 +6,23 @@ use std::path::Path;
 use std::io;
 use num::Zero;
 
-//use traits::{ Pixel, Primitive, GenericImage, ImageDecoder };
+use std::io::{BufReader, BufWriter};
+use std::fs::File;
+use stream::{
+    ByteOrder,
+    // EndianWriter,
+    SmartWriter,
+    // SmartReader
+};
+
+use traits::{ Pixel, Primitive, GenericImage }; // , ImageDecoder };
 //use color::{ Rgb, Rgba, Luma, LumaA, FromColor, ColorType };
-//use image::other::Pixels; // ::{ ImageBuffer};
+use image::other::{
+    PixelType,
+    Pixels,
+    GrayU16,
+    GrayF32
+}; 
 
 // use image::GenericImage;
 // use dynimage::{save_buffer,image_to_bytes};
@@ -139,7 +153,6 @@ where P: Pixel + 'static,
                     -> Option<ImageBuffer<P, Container>> {
         if width as usize
            * height as usize
-           * <P as Pixel>::channel_count() as usize
            <= buf.len() {
             Some(ImageBuffer {
                 data: buf,
@@ -176,9 +189,7 @@ where P: Pixel + 'static,
     /// Returns an iterator over the pixels of this image.
     pub fn pixels<'a>(&'a self) -> PixelRefs<'a, P> {
         PixelRefs {
-            chunks: self.data.chunks(
-                <P as Pixel>::channel_count() as usize
-            )
+            chunks: self.data.chunks( 1 )
         }
     }
 
@@ -200,7 +211,7 @@ where P: Pixel + 'static,
     ///
     /// Panics if `(x, y)` is out of the bounds `(width, height)`.
     pub fn get_pixel(&self, x: u32, y: u32) -> &P {
-        let no_channels = <P as Pixel>::channel_count() as usize;
+        let no_channels = 1; 
         let index  = no_channels * (y * self.width + x) as usize;
         <P as Pixel>::from_slice(
             &self.data[index .. index + no_channels]
@@ -218,9 +229,7 @@ where P: Pixel + 'static,
     /// along with a mutable reference to them.
     pub fn pixels_mut(&mut self) -> PixelsMut<P> {
         PixelsMut {
-            chunks: self.data.chunks_mut(
-                <P as Pixel>::channel_count() as usize
-            )
+            chunks: self.data.chunks_mut( 1 )
         }
     }
 
@@ -241,7 +250,7 @@ where P: Pixel + 'static,
     ///
     /// Panics if `(x, y)` is out of the bounds `(width, height)`.
     pub fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut P {
-        let no_channels = <P as Pixel>::channel_count() as usize;
+        let no_channels = 1; 
         let index  = no_channels * (y * self.width + x) as usize;
         <P as Pixel>::from_slice_mut(
             &mut self.data[index .. index + no_channels]
@@ -259,36 +268,47 @@ where P: Pixel + 'static,
 }
 
 impl<P, Container> ImageBuffer<P, Container>
-where P: Pixel<Subpixel=u8> + 'static,
-     Container: Deref<Target=[u8]> {
+where P: Pixel<Subpixel=f32> + 'static,
+     // Container: Deref<Target=[f32]> 
+     {
    /// Saves the buffer to a file at the path specified.
    ///
    /// The image format is derived from the file extension.
    /// Currently only jpeg and png files are supported.
-   pub fn save<Q>(&self, path: Q) -> io::Result<()> where Q: AsRef<Path> {
-       // This is valid as the subpixel is u8.
-       save_buffer(path,
-                   self.image_to_bytes(),
-                   self.width(),
-                   self.height(),
-                   <P as Pixel>::color_type())
-   }
-}
-
-impl<P, Container> ImageBuffer<P, Container>
-where P: Pixel<Subpixel=u16> + 'static,
-     Container: Deref<Target=[u16]> {
-   /// Saves the buffer to a file at the path specified.
-   ///
-   /// The image format is derived from the file extension.
-   /// Currently only jpeg and png files are supported.
-   pub fn save<Q>(&self, path: Q) -> io::Result<()> where Q: AsRef<Path> {
-       // This is valid as the subpixel is u16.
-       save_buffer(path,
-                   (self as &[u16] ).iter().flat_map( |v| vec![ ( *v >> 8 )as u8, ( *v & 0xFF ) as u8 ] ).collect(),
-                   self.width(),
-                   self.height(),
-                   <P as Pixel>::color_type())
+   pub fn save<Q>(&self, output_path: Q) -> io::Result<()> where Q: AsRef<Path> {
+       let f = match File::create( output_path ) {
+            Ok( file ) => file,
+            Err( msg ) => { println!("{}", msg); panic!( "room" ); }
+        };
+    
+        let w = BufWriter::new( &f );
+        let mut wtr = SmartWriter::wrap(w, ByteOrder::LittleEndian);
+    
+        let pixel_type = <P as Pixel>::pixel_type();
+        let fmt1 = 0u32;
+        
+        let fmt2 = match pixel_type {
+            PixelType::Short16 => 0u32,
+            PixelType::Float32 => 2u32 
+        };
+        
+       wtr.write_u32(fmt1);
+       wtr.write_u32(fmt2);
+       wtr.write_u32( self.width );
+       wtr.write_u32( self.height );
+       
+       Ok( match pixel_type {
+            PixelType::Short16 => {
+                for p in self.pixels() {
+                    try!(wtr.write_u16());
+                }
+            },
+            PixelType::Float32 => {
+                for p in self.pixels() {
+                    try!(wtr.write_f32());
+                }
+            }
+        })
    }
 }
 
@@ -374,11 +394,7 @@ where P: Pixel + 'static,
         *self.get_pixel_mut(x, y) = pixel
     }
 
-    /// Put a pixel at location (x, y), taking into account alpha channels
-    /// DEPRECATED: This method will be removed. Blend the pixel directly instead.
-    fn blend_pixel(&mut self, x: u32, y: u32, p: P) {
-        self.get_pixel_mut(x, y).blend(&p)
-    }
+
     fn pixels(&self) -> Pixels<Self> {
         let (width, height) = self.dimensions();
 
@@ -402,7 +418,6 @@ where P::Subpixel: 'static {
             data: repeat(Zero::zero()).take(
                     (width as u64
                      * height as u64
-                     * (<P as Pixel>::channel_count() as u64)
                     ) as usize
                 ).collect(),
             width: width,
@@ -447,82 +462,10 @@ where P::Subpixel: 'static {
     }
 }
 
-/// Provides color conversions for whole image buffers.
-pub trait ConvertBuffer<T> {
-    /// Converts `self` to a buffer of type T
-    ///
-    /// A generic impementation is provided to convert any image buffer to a image buffer
-    /// based on a `Vec<T>`.
-    fn convert(&self) -> T;
-}
-
-//// concrete implementation Luma -> Rgba
-//impl GrayImage {
-//    /// Expands a color palette by re-using the existing buffer.
-//    /// Assumes 8 bit per pixel. Uses an optionally transparent index to
-//    /// adjust it's alpha value accordingly.
-//    pub fn expand_palette(self,
-//                          palette: &[(u8, u8, u8)],
-//                          transparent_idx: Option<u8>) -> RgbaImage {
-//        let (width, height) = self.dimensions();
-//        let mut data = self.into_raw();
-//        let entries = data.len();
-//        data.reserve_exact(entries.checked_mul(3).unwrap()); // 3 additional channels
-//        // set_len is save since type is u8 an the data never read
-//        unsafe { data.set_len(entries.checked_mul(4).unwrap()) }; // 4 channels in total
-//        let mut buffer = ImageBuffer::from_vec(width, height, data).unwrap();
-//        expand_packed(&mut buffer, 4, 8, |idx, pixel| {
-//            let (r, g, b) = palette[idx as usize];
-//            let a = if let Some(t_idx) = transparent_idx {
-//                if t_idx == idx {
-//                    0
-//                } else {
-//                    255
-//                }
-//            } else {
-//                255
-//            };
-//            pixel[0] = r;
-//            pixel[1] = g;
-//            pixel[2] = b;
-//            pixel[3] = a;
-//        });
-//        buffer
-//    }
-//}
-
-// TODO: Equality constraints are not yet supported in where clauses, when they
-// are, the T parameter should be removed in favor of ToType::Subpixel, which
-// will then be FromType::Subpixel.
-impl<'a, 'b, Container, FromType: Pixel + 'static, ToType: Pixel + 'static>
-    ConvertBuffer<ImageBuffer<ToType, Vec<ToType::Subpixel>>>
-    for ImageBuffer<FromType, Container>
-    where Container: Deref<Target=[FromType::Subpixel]>,
-          ToType: FromColor<FromType>,
-          FromType::Subpixel: 'static,
-          ToType::Subpixel: 'static {
-
-    fn convert(&self) -> ImageBuffer<ToType, Vec<ToType::Subpixel>> {
-        let mut buffer: ImageBuffer<ToType, Vec<ToType::Subpixel>>
-            = ImageBuffer::new(self.width, self.height);
-        for (mut to, from) in buffer.pixels_mut().zip(self.pixels()) {
-            to.from_color(from)
-        }
-        buffer
-    }
-}
-
-/// Sendable Rgb image buffer
-pub type RgbImage = ImageBuffer<Rgb<u8>, Vec<u8>>;
-/// Sendable Rgb + alpha channel image buffer
-pub type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
 /// Sendable grayscale image buffer
-pub type GrayImage = ImageBuffer<Luma<u8>, Vec<u8>>;
-
-/// Sendable grayscale image buffer
-pub type Gray16Image = ImageBuffer<Luma<u16>, Vec<u16>>;
+pub type Gray16Image = ImageBuffer<GrayU16<u16>, Vec<u16>>;
 /// Sendable grayscale + alpha channel image buffer
-pub type GrayAlphaImage = ImageBuffer<LumaA<u8>, Vec<u8>>;
+pub type GrayFloatImage = ImageBuffer<GrayF32<f32>, Vec<f32>>;
 
 #[cfg(test)]
 mod test {

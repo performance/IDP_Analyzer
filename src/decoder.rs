@@ -14,6 +14,7 @@ use image::error::{
 };
 
 use image::other::{
+    PixelType,
     DecodingBuffer,
     DecodingResult
 };
@@ -23,11 +24,6 @@ use super::stream::{
     EndianReader,
     SmartReader
 };
-#[derive(Debug)]
-pub enum PixelType {
-    Short16,
-    Float32
-}
 
 
 

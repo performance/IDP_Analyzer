@@ -7,9 +7,10 @@ use std::path::Path;
 // use byteorder::{ ReadBytesExt, BigEndian, LittleEndian};
 mod stream;
 mod decoder; 
-// mod buffer;
+mod buffer;
 mod image;
- 
+mod traits;
+
 use stream::{
     ByteOrder,
     EndianWriter,
