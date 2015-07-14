@@ -143,8 +143,8 @@ pub struct ImageBuffer<P: Pixel, Container> {
 
 impl<P, Container> GenericImage for ImageBuffer<P, Container>
 where P: Pixel + 'static,
-      Container: Deref<Target=[P::Subpixel]> + DerefMut,
-      P::Subpixel: 'static {
+      Container: Deref<Target=[f32]> + DerefMut,
+      P::Subpixel: Primitive + 'static {
 
     type Pixel = P;
 
@@ -157,7 +157,7 @@ where P: Pixel + 'static,
     }
 
     fn get_pixel(&self, x: u32, y: u32) -> P {
-        *self.get_pixel(x, y)
+        self.get_pixel(x, y)
     }
 
     fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut P {
@@ -171,7 +171,6 @@ where P: Pixel + 'static,
 
     fn pixels(&self) -> Pixels<Self> {
         let (width, height) = self.dimensions();
-
         Pixels::new ( self, 0, 0, width, height )
     }
 
@@ -225,7 +224,7 @@ where P: Pixel + 'static,
     }
 
     /// Returns an iterator over the pixels of this image.
-    pub fn pixels<'a>(&'a self) -> PixelRefs<'a, P> {
+    pub fn pixel_refs<'a>(&'a self) -> PixelRefs<'a, P> {
         PixelRefs {
             chunks: self.data.chunks( 1 )
         }
@@ -236,7 +235,7 @@ where P: Pixel + 'static,
     /// along with a reference to them.
     pub fn enumerate_pixels<'a>(&'a self) -> EnumeratePixels<'a, P> {
         EnumeratePixels {
-            pixels: self.pixels(),
+            pixels: self.pixel_refs(),
             x: 0,
             y: 0,
             width: self.width
@@ -282,6 +281,7 @@ where P: Pixel + 'static,
         }
     }
 
+
     /// Gets a reference to the mutable pixel at location `(x, y)`
     ///
     /// # Panics
@@ -307,10 +307,16 @@ where P: Pixel + 'static,
 
 
 impl<P, Container> ImageBuffer<P, Container>
-where P: Pixel + 'static , P::Subpixel: Primitive + 'static
+where P: Pixel + 'static,
+      Container: Deref<Target=[f32]> + DerefMut,
+      P::Subpixel: Primitive + 'static {
+          
+          
+      
+// where P: Pixel + 'static , P::Subpixel: Primitive + 'static
 //where P: Pixel<Subpixel=f32> + 'static,
      // Container: Deref<Target=[f32]> 
-     {
+     // {
    /// Saves the buffer to a file at the path specified.
    ///
    /// The image format is derived from the file extension.
@@ -339,13 +345,13 @@ where P: Pixel + 'static , P::Subpixel: Primitive + 'static
        
        Ok( match pixel_type {
             PixelType::Short16 => {
-                for p in self.pixels() {
+                for (x,y,p ) in self.pixels() {
                     try!(wtr.write_u16( p.value() ));
                 }
             },
             PixelType::Float32 => {
-                for p in self.pixels() {
-                    try!(wtr.write_f32( p.value() ));
+                for (x,y,p) in self.pixels() {
+                    try!(wtr.write_f32( ( p.value() as f32 ) ));
                 }
             }
         })
